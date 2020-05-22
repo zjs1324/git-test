@@ -5,12 +5,15 @@
 #include <unistd.h>
 #include <sys/un.h>
 #include <sys/types.h>
-
-#define SERVER_SOCKET "/home/fibo/VScode_prj/Unix.domain"
-#define MY_DEBUG printf("[%s %s] %s: %s: %d\n",__DATE__,__TIME__,__FILE__,__FUNCTION__,__LINE__);
-#define MAX_INPUT_LEN 50
+#include "fibo_socket_client.h"
 
 int main(void){
+
+    fibo_socket_client();
+    return 0;
+}
+
+int fibo_socket_client(void){
     struct sockaddr_un client_addr;
     int sockfd = socket(AF_UNIX,SOCK_STREAM,0);
     memset(&client_addr,0,sizeof (struct sockaddr_un));
