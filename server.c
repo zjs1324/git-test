@@ -6,7 +6,7 @@
 #include <sys/un.h>
 #include <sys/types.h>
 
-#define SERVER_SOCKET "/home/fibo/VScode_prj/Unix.domain"
+#define CLIENT_TO_SERVER_PATH "/home/fibo/VScode_prj/client_to_server.domain"
 #define MAX_OUTPUT_LEN 50
 
 int main(void){
@@ -14,7 +14,7 @@ int main(void){
 
     struct sockaddr_un server_addr;
     server_addr.sun_family = AF_UNIX;
-    strcpy(server_addr.sun_path,SERVER_SOCKET);
+    strcpy(server_addr.sun_path,CLIENT_TO_SERVER_PATH);
     
     int server_sockfd = socket(AF_UNIX,SOCK_STREAM,0);
     if(server_sockfd < 0){

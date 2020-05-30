@@ -10,14 +10,10 @@
 #define SERVER_TO_CLIENT_PATH "/home/fibo/VScode_prj/server_to_client.domain"
 #define MY_DEBUG printf("[%s %s] %s: %s: %d\n",__DATE__,__TIME__,__FILE__,__FUNCTION__,__LINE__);
 #define MAX_INPUT_LEN 50
+#define MAX_MSG_LEN  1014
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
 
-/*           Function declaration           */
-
-int fibo_init_socket_client(void);
-
-int init_port_bridge(void);
-
-void* client_to_server_port(void* pthread_info);
 /*           Struct definition                  */
 typedef struct{
     char* p_from_path;
@@ -28,4 +24,15 @@ typedef struct{
     pthread_mutex_t* p_to_mutex;
 }p_thread_info_t;
 
+/*           Function declaration           */
+
+int init_socket_client_port(void);
+
+int init_port_bridge(void);
+
+void* client_to_server_port(void* pthread_info);
+
+void* server_to_client_port(void* pthread_info);
+
+int send_msg_process(int socketfd,char* buf,int num_read,p_thread_info_t* tinfo);
 #endif
