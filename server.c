@@ -10,7 +10,7 @@
 #define MAX_OUTPUT_LEN 50
 
 int main(void){
-    unlink("server_socket");
+    unlink("CLIENT_TO_SERVER_PATH");
 
     struct sockaddr_un server_addr;
     server_addr.sun_family = AF_UNIX;

@@ -14,12 +14,15 @@
 #include "fibo_socket_client.h"
 
 /*        Global variable begin      */
-int client_port_fd = -1;
-int server_port_fd = -1;
+
 
 int g_sockfd       = -1;
-pthread_mutex_t client_port_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t server_port_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+const fibo_cust_port_cfg fibo_port_cfg[] = 
+    {{host_modem_atport,CLIENT_TO_SERVER_PATH,SERVER_TO_CLIENT_PATH,FIBO_COMMAN_AT_MODE},
+     {modem_host_atport,SERVER_TO_CLIENT_PATH,CLIENT_TO_SERVER_PATH,FIBO_COMMAN_AT_MODE}};
+
+
 /*        Global variable end         */
 void* server_to_client_port(void* pthread_info){
 
@@ -91,7 +94,7 @@ void* client_to_server_port(void* pthread_info){
     else{
         printf("socket client init success , client_ret = %d\n\r",client_ret);
     }
-
+#if 0
     while(1){
         if(*temp_info.p_from_fd < 0){
             printf("client to server bridge open begin \n\r");
@@ -127,57 +130,35 @@ void* client_to_server_port(void* pthread_info){
             
         }
     }
+    #endif
     return NULL;
 }
 
 int init_port_bridge(void){
-    printf("FUNC ENTER: %s  Port bridge init begin \n\r",__FUNCTION__);
-    p_thread_info_t client_port_info;
-    p_thread_info_t server_port_info;
 
-    pthread_t client_port_thread;
-    pthread_t server_port_thread;
+    p_thread_info_t* fibo_port_thread;
+    int fibo_temp_pth_num = 0;
+    int fibo_pth_num = 0;
+    int fibo_thread_max_num = end_port;
+    fibo_thread_name fibo_port_thread_init = host_modem_atport;
 
-    //from client to server pthread create
-    memset((void*)&client_port_info,0,sizeof(client_port_info));
-    client_port_info.p_from_fd         = &client_port_fd;
-    client_port_info.p_to_fd           = &server_port_fd;
-    client_port_info.p_from_fd         = (char*)(CLIENT_TO_SERVER_PATH);
-    client_port_info.p_to_path         = (char*)(SERVER_TO_CLIENT_PATH);
-    client_port_info.p_from_mutex      = &client_port_mutex;
-    client_port_info.p_to_mutex        = &server_port_mutex;
+    fibo_port_thread = (p_thread_info_t*)malloc(fibo_thread_max_num * (sizeof(p_thread_info_t)));
+    if(NULL == fibo_port_thread){
+        printf("malloc for thread failed\n\r");
+        return 0;
+    }
+    bzero(fibo_port_thread,fibo_thread_max_num * (sizeof(p_thread_info_t)));
+    printf("%p,%d\n\r",fibo_port_thread,fibo_thread_max_num * (sizeof(p_thread_info_t)));
+    return 0;
 
-    if( 0 == pthread_create(&client_port_thread,NULL,client_to_server_port,&client_port_info)){
-        printf("client to server pthread create success\n\r");
-    }
-    else{
-        printf("client to server pthread create failed\n\r");
-    }
-  
-    //from server to client pthread create
-    memset((void*)&server_port_info,0,sizeof(server_port_info));
-    server_port_info.p_from_fd         = &server_port_fd;
-    server_port_info.p_to_fd           = &client_port_fd;
-    server_port_info.p_from_path       = (char*)(SERVER_TO_CLIENT_PATH);
-    server_port_info.p_to_path         = (char*)(CLIENT_TO_SERVER_PATH);
-    server_port_info.p_from_mutex      = &server_port_mutex;
-    server_port_info.p_to_mutex        = &client_port_mutex;
-
-    if( 0 == pthread_create(&server_port_thread,NULL,server_to_client_port,&client_port_info)){
-        printf("server to client pthread create success\n\r");
-    }
-    else{
-        printf("server to client pthread create failed\n\r");
-    }
-
-    if(0 == pthread_join(client_port_thread,NULL)){
-        printf("recive client port thread join\n\r");
-    }
-    if(0 == pthread_join(server_port_thread,NULL)){
-        printf("recive server port thread join\n\r");
+#if 0
+    while(fibo_port_thread_init != 0){
+        printf("fibo_port_thread %d init begin in %s\n\r",fibo_port_thread_init,__func__);
+        fibo_port_thread = (p_thread_info_t*)malloc(sizeof(p_thread_info_t)); 
     }
 }
-
+#endif
+}
 int main(void){
     init_port_bridge();
     return 0;
