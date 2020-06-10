@@ -75,89 +75,105 @@ int init_socket_client_port(void){
 #endif
     return 0;
 }
-void* client_to_server_port(void* pthread_info){
-    p_thread_info_t temp_info      = *((p_thread_info_t*)pthread_info);
-    int c_num_read                 = 0;
-    int ret                        = 0;
-    int client_ret                 = 0; 
-    int temp_fd                    = 0;
-    char buffer[MAX_MSG_LEN+1];
-    //struct pollfd pollinfo;
 
-    //memset(&pollinfo,0,sizeof(struct pollfd));
-    //pollinfo.events = POLLIN | POLLPRI | POLLERR | POLLHUP;
 
-    client_ret = init_socket_client_port();
-    if(client_ret == 0){
-        printf("socket client init error , client_ret = %d\n\r",client_ret);
-    }
-    else{
-        printf("socket client init success , client_ret = %d\n\r",client_ret);
-    }
-#if 0
-    while(1){
-        if(*temp_info.p_from_fd < 0){
-            printf("client to server bridge open begin \n\r");
-            temp_fd = open(temp_info.p_from_path,O_RDWR);
-            printf("client to server bridge end \n\r");
-            if(temp_fd < 0){
-                sleep(1);
-                continue;
-            }
-            else{
-                pthread_mutex_lock(temp_info.p_from_mutex);
-                *temp_info.p_from_fd = temp_fd;
-                pthread_mutex_unlock(temp_info.p_from_mutex);
-                //printf("Get fd success and assign to POLLfd \n\r");
-                //pollinfo.fd = *temp_info.p_from_fd;
-                //printf("pollinfo.fd = %d \n\r",pollinfo.fd);
-            }
-                pthread_mutex_lock(temp_info.p_from_mutex);
-                c_num_read = read(*temp_info.p_from_fd,buffer,MAX_MSG_LEN);
-                pthread_mutex_unlock(temp_info.p_from_mutex);
-                if(c_num_read < 0){
-                    pthread_mutex_lock(temp_info.p_from_mutex);
-                    close(*temp_info.p_from_fd);
-                    pthread_mutex_unlock(temp_info.p_from_mutex);
-                    continue;
-                }
-                if(0 == send_msg_process(g_sockfd,buffer,c_num_read,&temp_info)){
-                    continue;
-                }
-                else{
-
-                }
-            
-        }
-    }
-    #endif
+void* modem_to_host_atport_thread(void* pthread_info){
+    printf("%s begin....\n\r",__func__);
+    p_thread_info_t temp_info        = *((p_thread_info_t*)pthread_info);
     return NULL;
 }
 
+void* host_to_modem_atport_thread(void* pthread_info){
+    
+}
+
+
 int init_port_bridge(void){
-
-    p_thread_info_t* fibo_port_thread;
-    int fibo_temp_pth_num = 0;
+    printf("%s begin\n\r",__func__);
+    p_thread_info_t* fibo_port_thread_info;
+    pthread_t* fibo_port_thread;
+    int fibo_mutex_init_ret = 0;
     int fibo_pth_num = 0;
+    int fibo_pth_join_num = 0;
     int fibo_thread_max_num = end_port;
-    fibo_thread_name fibo_port_thread_init = host_modem_atport;
 
-    fibo_port_thread = (p_thread_info_t*)malloc(fibo_thread_max_num * (sizeof(p_thread_info_t)));
+    //  Memory alloc for fibo_port_thread_info
+    fibo_port_thread_info = (p_thread_info_t*)malloc(fibo_thread_max_num * (sizeof(p_thread_info_t)));
+    if(NULL == fibo_port_thread_info){
+        printf("malloc for thread info failed\n\r");
+        return 0;
+    }
+    bzero(fibo_port_thread_info,fibo_thread_max_num * (sizeof(p_thread_info_t)));
+    printf("%p,%d\n\r",fibo_port_thread_info,fibo_thread_max_num * (sizeof(p_thread_info_t)));
+
+    //  Memory alloc for fibo_port_thread
+    fibo_port_thread = (pthread_t*)malloc(fibo_thread_max_num * (sizeof(pthread_t)));
     if(NULL == fibo_port_thread){
         printf("malloc for thread failed\n\r");
         return 0;
     }
-    bzero(fibo_port_thread,fibo_thread_max_num * (sizeof(p_thread_info_t)));
-    printf("%p,%d\n\r",fibo_port_thread,fibo_thread_max_num * (sizeof(p_thread_info_t)));
-    return 0;
+    bzero(fibo_port_thread,fibo_thread_max_num * sizeof(pthread_t));
+    printf("%p,%d\n\r",fibo_port_thread,fibo_thread_max_num * (sizeof(pthread_t)));
 
-#if 0
-    while(fibo_port_thread_init != 0){
-        printf("fibo_port_thread %d init begin in %s\n\r",fibo_port_thread_init,__func__);
-        fibo_port_thread = (p_thread_info_t*)malloc(sizeof(p_thread_info_t)); 
+    //   Loop to assign thread parameters and create threads
+    while(fibo_pth_num < fibo_thread_max_num){
+        strcpy(&fibo_port_thread_info[fibo_pth_num].p_thread_name,&fibo_port_cfg[fibo_pth_num].thraed_name);
+        printf("thread %d p_thread_name: %d\n\r",fibo_pth_num,fibo_port_thread_info[fibo_pth_num].p_thread_name );
+        strcpy(&fibo_port_thread_info[fibo_pth_num].p_from_path,&fibo_port_cfg[fibo_pth_num].from_path);
+        printf("thread %d p_from_path: %s\n\r",fibo_pth_num,fibo_port_thread_info[fibo_pth_num].p_from_path);
+        strcpy(&fibo_port_thread_info[fibo_pth_num].p_to_path,&fibo_port_cfg[fibo_pth_num].to_path);
+        printf("thread %d p_to_path: %s\n\r",fibo_pth_num,fibo_port_thread_info[fibo_pth_num].p_to_path);
+        strcpy(&fibo_port_thread_info[fibo_pth_num].p_msg_mode,&fibo_port_cfg[fibo_pth_num].msg_mode);
+        printf("thread %d msg_mode: %d\n\r",fibo_pth_num,fibo_port_thread_info[fibo_pth_num].p_msg_mode);
+        if((fibo_mutex_init_ret = pthread_mutex_init(&fibo_port_thread_info[fibo_pth_num].p_from_mutex,NULL)) != 0){
+            perror("p_from_mutex init failed\n\r");
+        }
+        else{
+            printf("p_from_mutex init sucesss\n\r");
+        }
+        if((fibo_mutex_init_ret = pthread_mutex_init(&fibo_port_thread_info[fibo_pth_num].p_to_mutex,NULL)) != 0){
+            perror("p_to_mutex init failed\n\r");
+        }
+        else{
+            printf("p_to_mutex init sucesss\n\r");
+        }
+        if((fibo_pth_num == 0 && fibo_port_thread_info[fibo_pth_num].p_thread_name == 0) == 0){
+            printf("host to modem thread create begin\n\r");
+            if(0 == pthread_create(&fibo_port_thread[fibo_pth_num],NULL,host_to_modem_atport_thread,(void*)&fibo_port_thread_info[fibo_pth_num])){
+                printf("host_to_modem_atport_thread create success\n\r");
+            }
+            else{
+                printf("host_to_modem_atport_thread create failed\n\r");
+            }
+        }else if((fibo_pth_num == 1 && fibo_port_thread_info[fibo_pth_num].p_thread_name == 1) == 0){
+            printf("modem to host thread create begin\n\r");
+            if(0 == pthread_create(&fibo_port_thread[fibo_pth_num],NULL,modem_to_host_atport_thread,(void*)&fibo_port_thread_info[fibo_pth_num])){
+                printf("host_to_modem_atport_thread create success\n\r");
+            }
+            else{
+                printf("host_to_modem_atport_thread create failed\n\r");
+            }
+        }
+        
+        fibo_pth_num++;
     }
-}
-#endif
+
+
+    while (fibo_pth_join_num < fibo_thread_max_num){
+        pthread_mutex_destroy(&fibo_port_thread_info[fibo_pth_join_num].p_from_mutex);
+        pthread_mutex_destroy(&fibo_port_thread_info[fibo_pth_join_num].p_to_mutex);
+        if(0 == pthread_join(fibo_port_thread[fibo_pth_join_num],NULL)){
+            printf("pthread %d join ok\n\r",fibo_pth_join_num);
+        }
+        fibo_pth_join_num++;
+    }
+    
+    free(fibo_port_thread_info);
+    fibo_port_thread_info = NULL;
+    free(fibo_port_thread);
+    fibo_port_thread = NULL;
+
+    return 0;
 }
 int main(void){
     init_port_bridge();
