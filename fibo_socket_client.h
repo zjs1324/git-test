@@ -6,6 +6,7 @@
 
 /*           Macro declaration              */
 
+#define FIBO_SOCKET_PATH "/home/fibo/VScode_prj/socket.domain"
 #define CLIENT_TO_SERVER_PATH "/home/fibo/VScode_prj/client_to_server.domain"
 #define SERVER_TO_CLIENT_PATH "/home/fibo/VScode_prj/server_to_client.domain"
 #define MY_DEBUG printf("[%s %s] %s: %s: %d\n",__DATE__,__TIME__,__FILE__,__FUNCTION__,__LINE__);
@@ -15,7 +16,29 @@
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 #define MAX_PORT_NUM    10
 #define MAX_PORT_PATH_LEN 100
+#define OPEN_FAILURE_SLEEP_TIME 1
+#define FIBO_PTHREAD_MUTEX_LOCK(mutex)                          \
+        do{                                                     \
+            if(pthread_mutex_lock(mutex) < 0){                  \
+                printf("mutex lock failed [0x%p]\n\r",mutex);   \
+            }                                                   \
+            printf("mutex locked [0x%p]",mutex);                \
+        }while(0);
+#define FIBO_PTHREAD_MUTEX_UNLOCK(mutex)                          \
+        do{                                                     \
+            if(pthread_mutex_unlock(mutex) < 0){                  \
+                printf("mutex unlock failed [0x%p]\n\r",mutex);   \
+            }                                                   \
+            printf("mutex unlocked [0x%p]",mutex);                \
+        }while(0);
 /*           Struct definition                  */
+
+typedef enum{
+    E_ERR_CODE_SUCCESS = 0,
+    E_ERR_CODE_INPUT_ERROR,
+    E_ERR_CODE_SOCKET_ERROR,
+    E_ERR_CODE_CONNECT_ERROR,
+}e_fibo_err_code;
 
 typedef enum{
     FIBO_DATA_MODE = 0,
@@ -49,7 +72,7 @@ typedef struct{
 
 /*           Function declaration           */
 
-int init_socket_client_port(void);
+int init_socket_client_port(int g_socketfd);
 
 int init_port_bridge(void);
 
