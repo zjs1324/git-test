@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/un.h>
 #include <sys/types.h>
+#include <sys/ioctl.h>
 #include <poll.h>
 #include <fcntl.h>
 #include <sys/types.h>
@@ -40,6 +41,20 @@ int send_msg_process(int socketfd,char* buf,int num_read,p_thread_info_t* tinfo)
         return 0;
     }
 }
+
+void construct_signal_string(char* str, size_t size, int bits){
+    //print any bits that aren't DTR/CD/RI/RIS as a mask.
+    unsigned int unaccounted_bits = bits & ~(TIOCM_DTR | TIOCM_CD | TIOCM_RI | TIOCM_RTS);
+
+    //And print DTR/CD/RI/RIS in readable format.
+    snprintf(str, size -1, "0x%x%s%s%s%s",
+    unaccounted_bits,
+    bits & TIOCM_DTR ? " | DTR" : "",
+    bits & TIOCM_CD  ? " | CD " : "",
+    bits & TIOCM_RI  ? " | RI " : "",
+    bits & TIOCM_RTS ? " | RTS" : "");
+}
+
 int init_socket_client_port(int g_socketfd){
     printf("FUNC ENTER: %s  init socket begin \n\r",__FUNCTION__);
     int len = 0;
@@ -83,9 +98,18 @@ int init_socket_client_port(int g_socketfd){
 
 
 void* modem_to_host_atport_thread(void* pthread_info){
+
+}
+
+void* host_to_modem_atport_thread(void* pthread_info){
     printf("%s begin....\n\r",__func__);
-    p_thread_info_t temp_info        = *((p_thread_info_t*)pthread_info);
-    int temp_fd = -1;  
+    p_thread_info_t temp_info    = *((p_thread_info_t*)pthread_info);
+    int temp_fd                  = -1; 
+    int ret                      = 0;
+    int signals                  = 0;
+    int num_read                 = 0;
+    char buf[MAX_MSG_SIZE + 1];
+    char signal_str_buf[MAX_MSG_SIZE + 1];
     struct pollfd pollinfo;
 
     memset(&pollinfo,0,sizeof(pollinfo));
@@ -121,12 +145,72 @@ void* modem_to_host_atport_thread(void* pthread_info){
                 printf("pollinfo.fd = %d\n\r",pollinfo.fd);
             }
         }
-        
-    }
-}
+        //Use the USB file
+        pollinfo.fd = 0;
+        ret = poll(&pollinfo,1,-1);
 
-void* host_to_modem_atport_thread(void* pthread_info){
-    
+        if(pollinfo.revents & POLLERR){
+            printf("POLLERR is set\n\r");
+        }
+
+        if(pollinfo.revents & POLLHUP){
+            printf("POLLHUP is set\n\r");
+        }
+
+        //If poll did not work as espected, or if the subsystem is not available, start over.
+        if((ret < 0) || (pollinfo.revents & (POLLERR | POLLHUP))){
+            printf("Sending DTR low signal to MODEM\n\r");
+            signals = signals & ~TIOCM_DTR;
+
+            construct_signal_string(signal_str_buf, MAX_MSG_SIZE, signals);
+
+            FIBO_PTHREAD_MUTEX_LOCK(&temp_info.p_to_mutex);
+            ret = ioctl(temp_info.p_to_fd,TIOCMSET,&signals);
+            FIBO_PTHREAD_MUTEX_UNLOCK(&temp_info.p_to_mutex);
+            
+            FIBO_PTHREAD_MUTEX_LOCK(&temp_info.p_from_mutex);
+            close(temp_info.p_from_fd);
+            temp_info.p_from_fd = -1;
+            FIBO_PTHREAD_MUTEX_UNLOCK(&temp_info.p_from_mutex);
+
+            continue;
+        }
+
+        //POLLPRI is used to indicate a signal change.
+        if(pollinfo.revents & POLLPRI){
+            printf("POLLPRI is set\n\r");
+
+            FIBO_PTHREAD_MUTEX_LOCK(&temp_info.p_from_mutex);
+            ret = ioctl(temp_info.p_from_fd, TIOCMGET, &signals);
+            FIBO_PTHREAD_MUTEX_UNLOCK(&temp_info.p_from_mutex);
+
+            construct_signal_string(signal_str_buf,MAX_MSG_SIZE,signals);
+
+            FIBO_PTHREAD_MUTEX_LOCK(&temp_info.p_to_mutex);
+            ret = ioctl(temp_info.p_to_fd, TIOCMSET, &signals);
+            FIBO_PTHREAD_MUTEX_UNLOCK(&temp_info.p_to_mutex);
+        }
+        
+        //Read data if we can
+        if(pollinfo.revents & POLLIN){
+            printf("POLLIN is set\n\r");
+
+            FIBO_PTHREAD_MUTEX_LOCK(&temp_info.p_from_mutex);
+            num_read = read(temp_info.p_from_fd, buf, MAX_MSG_SIZE);
+            FIBO_PTHREAD_MUTEX_UNLOCK(&temp_info.p_from_mutex);
+            printf("read from '%s' num_read %d",temp_info.p_from_path,num_read);
+
+            if(num_read < 0){
+                FIBO_PTHREAD_MUTEX_LOCK(&temp_info.p_from_mutex);
+                close(temp_info.p_from_fd);
+                temp_info.p_from_fd = -1;
+                FIBO_PTHREAD_MUTEX_UNLOCK(&temp_info.p_from_mutex);
+                continue;
+            }
+
+            
+        }
+    }    
 }
 
 
