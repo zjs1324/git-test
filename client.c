@@ -17,7 +17,8 @@
 /*        Global variable begin      */
 
 
-int g_host_modem_sockfd       = -1;
+int g_host_modem_sockfd        = -1;
+FIBO_MSG_MODE g_at_port_mode   = FIBO_COMMAN_AT_MODE;
 
 const fibo_cust_port_cfg fibo_port_cfg[] = 
     {{host_modem_atport,CLIENT_TO_SERVER_PATH,SERVER_TO_CLIENT_PATH,FIBO_COMMAN_AT_MODE},
@@ -26,20 +27,160 @@ const fibo_cust_port_cfg fibo_port_cfg[] =
 
 /*        Global variable end         */
 
-void* server_to_client_port(void* pthread_info){
+static int assemable_packhead(char* buf, fibo_pack_head_t* st_pack){
+
+    if(NULL == buf || NULL == st_pack){
+        printf("%s input error",__func__);
+        return -1;
+
+    }
+    memcpy(buf, st_pack, sizeof(fibo_pack_head_t));
+    return 0;
 
 }
-int send_msg_process(int socketfd,char* buf,int num_read,p_thread_info_t* tinfo){
-    int send_ret   = 0;
-    send_ret = send(socketfd,buf,sizeof(buf),0);
-    if( send_ret > 0){
-        printf("send_ret : %d \n\r",send_ret);
-        return send_ret;
+
+static int assemable_msghead(char* buf, fibo_msg_head_t* st_pack){
+
+    if(NULL == buf || NULL == st_pack){
+        printf("%s input error",__func__);
+        return -1;
+
     }
-    else{
-        printf("send error\n\r");
+    memcpy(buf, st_pack, sizeof(fibo_msg_head_t));
+    return 0;
+
+}
+
+static int assemable_sockhead(char* buf, fibo_sock_head_t* st_pack){
+
+    if(NULL == buf || NULL == st_pack){
+        printf("%s input error",__func__);
+        return -1;
+
+    }
+    memcpy(buf, st_pack, sizeof(fibo_sock_head_t));
+    return 0;
+
+}
+
+int client_send_msg(int socketfd, char* buf, int cmd_len, char* out_buf, int* out_len, FIBO_MSG_MODE* g_port_mode){
+
+    if(NULL == buf || NULL == out_buf || NULL == out_len || NULL == g_at_port_mode){
+        printf("%s input error",__func__);
         return 0;
     }
+
+    int iret_send = 0;
+    int offset    = 0;
+    char* buf_with_allhead = NULL;
+
+    buf_with_allhead = (char*)malloc(MAX_MSG_SIZE_WITH_HEAD);
+    if(NULL == buf_with_allhead){
+        printf("malloc failed\n\r");
+        return -1;
+    }
+
+    memset(buf_with_allhead, 0, MAX_MSG_SIZE_WITH_HEAD);
+
+    fibo_pack_head_t st_packhead;
+    fibo_msg_head_t  st_msghead;
+    fibo_sock_head_t st_sockhead;
+
+    memset(&st_packhead, 0, sizeof(fibo_pack_head_t));
+    memset(&st_msghead, 0, sizeof(fibo_pack_head_t));
+    memset(&st_sockhead, 0, sizeof(fibo_pack_head_t));
+
+    //add package-head
+    st_packhead.pack_head = PACK_HEAD;
+    st_packhead.pack_len = sizeof(fibo_pack_head_t) + sizeof(fibo_msg_head_t) + sizeof(fibo_sock_head_t) + cmd_len;
+    assemable_packhead(buf_with_allhead + offset, &st_packhead);
+    offset += sizeof(st_packhead);
+
+    //add message-head
+    st_msghead.msg_not_finish = 0;
+    st_msghead.msg_type = 0;
+    st_msghead.txn_id = 0;
+    assemable_msghead(buf_with_allhead + offset, &st_msghead);
+    offset += sizeof(st_msghead);
+
+    //add socket-head
+    st_sockhead.cmd_type = cmd_len;
+    st_sockhead.cust_flag = 0;
+    st_sockhead.data_complete = 0;
+    st_sockhead.data_start = 0;
+    st_sockhead.error_code = 0;
+    st_sockhead.cmd_type = *g_port_mode;
+    st_sockhead.usr_p = 0;
+    assemable_sockhead(buf_with_allhead + offset, &st_sockhead);
+    offset += sizeof(st_sockhead);
+
+    //add buf
+    memcpy(buf_with_allhead + offset, buf, cmd_len);
+    offset += cmd_len;
+
+    buf_with_allhead[offset] = '\0';
+
+    //send msg with all-head
+    iret_send = send(socketfd, buf_with_allhead, offset, 0);
+
+}
+
+int send_msg_to_platfrom(int socketfd, char* buf, int cmd_len, char* out_buf, int* out_len, FIBO_MSG_MODE* g_port_mode){
+
+    if(NULL == buf || NULL == out_buf || NULL == out_len || NULL  == g_at_port_mode){
+        printf("%s inout error\n\r",__func__);
+        return 0;
+    }
+
+    int iret = 0;
+
+    //client prepare to send message
+    iret = client_send_msg(socketfd, buf, cmd_len, out_buf, out_len, g_port_mode);
+}
+
+int send_msg_to_plat_or_modem(int socketfd, char* buf, int cmd_len, FIBO_MSG_MODE* g_port_mode,p_thread_info_t* tinfo){
+    
+    if(NULL == buf || NULL == g_port_mode || NULL == tinfo){
+        printf("%s input error",__func__);
+        return 0;
+    }
+
+    int iret = 0;
+    char out_buf[MAX_RECV_LEN] = {"app-pla is not runnig ,plz wait....\n\r"};
+    int out_len = strlen(out_buf);
+
+    //send msg to platform
+    if(*g_port_mode == FIBO_COMMAN_AT_MODE){
+        iret = send_msg_to_platfrom(socketfd, buf, cmd_len, out_buf, &out_len, g_port_mode);
+    }
+
+    /*
+
+        send to modem or something else to da
+
+    */
+}
+int common_input_atcmd_proc(int socketfd, char* buf, int num_read, FIBO_MSG_MODE* g_port_mode, p_thread_info_t* tinfo){
+
+    if(NULL == buf || NULL == g_port_mode || NULL == tinfo){
+        printf("%s\n\r",__func__);
+    }
+
+    int cmd_len = 0;
+
+    buf[num_read] = '\0';
+    cmd_len = strlen(buf);
+    printf("Message length = %d\n\r",cmd_len);
+
+    int t_num_read = num_read;
+    /*
+
+          Maybe have something to do ,but now transfer msg by socket
+
+    */
+
+    send_msg_to_plat_or_modem(socketfd, buf, cmd_len, g_port_mode, tinfo);
+    return 0;
 }
 
 void construct_signal_string(char* str, size_t size, int bits){
@@ -103,7 +244,7 @@ void* modem_to_host_atport_thread(void* pthread_info){
 
 void* host_to_modem_atport_thread(void* pthread_info){
     printf("%s begin....\n\r",__func__);
-    p_thread_info_t temp_info    = *((p_thread_info_t*)pthread_info);
+
     int temp_fd                  = -1; 
     int ret                      = 0;
     int signals                  = 0;
@@ -111,6 +252,13 @@ void* host_to_modem_atport_thread(void* pthread_info){
     char buf[MAX_MSG_SIZE + 1];
     char signal_str_buf[MAX_MSG_SIZE + 1];
     struct pollfd pollinfo;
+
+    if(pthread_info == NULL){
+        free(pthread_info);
+        pthread_info = NULL;
+        return NULL;
+    }
+    p_thread_info_t temp_info   =  *((p_thread_info_t*)pthread_info);
 
     memset(&pollinfo,0,sizeof(pollinfo));
     // These are the events we care about.  They should not be changed.
@@ -208,7 +356,10 @@ void* host_to_modem_atport_thread(void* pthread_info){
                 continue;
             }
 
-            
+            if(0 == common_input_atcmd_proc(g_host_modem_sockfd, buf, num_read,&g_at_port_mode, &temp_info)){
+                
+                // do something
+            }
         }
     }    
 }

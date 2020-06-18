@@ -6,6 +6,9 @@
 
 /*           Macro declaration              */
 
+#define PACK_HEAD 0x7061636B
+#define MAX_MSG_SIZE_WITH_HEAD  128 * 1024
+#define MAX_RECV_LEN  4 * 1024
 #define FIBO_SOCKET_PATH "/home/fibo/VScode_prj/socket.domain"
 #define CLIENT_TO_SERVER_PATH "/home/fibo/VScode_prj/client_to_server.domain"
 #define SERVER_TO_CLIENT_PATH "/home/fibo/VScode_prj/server_to_client.domain"
@@ -33,6 +36,12 @@
 /*           Struct definition                  */
 
 typedef enum{
+    E_CUST_DEFAULT = 0,
+    E_CUST_EE_DEFINFO,
+    E_CUST_JSON_RESTORE
+}e_fibo_cust_flag_type;
+
+typedef enum{
     E_ERR_CODE_SUCCESS = 0,
     E_ERR_CODE_INPUT_ERROR,
     E_ERR_CODE_SOCKET_ERROR,
@@ -44,6 +53,32 @@ typedef enum{
     FIBO_COMMAN_AT_MODE
 }FIBO_MSG_MODE;
 
+typedef enum{
+    MSG_SYNC  = 0x0,
+    MSG_ASYNC = 0x1,
+    MSG_IND   = 0x2,
+    MSG_MAX   = 0x3
+}FIBO_MSF_TYPE;
+
+typedef struct{
+    FIBO_MSG_MODE cmd_type;
+    e_fibo_cust_flag_type cust_flag;
+    int error_code;
+    unsigned long int usr_p;
+    unsigned long int content_len;
+    unsigned char data_start;
+    unsigned char data_complete;
+}fibo_sock_head_t;
+typedef struct{
+    unsigned long int txn_id;
+    FIBO_MSF_TYPE msg_type;
+    int msg_not_finish;
+}fibo_msg_head_t;
+
+typedef struct{
+    unsigned int pack_head;
+    unsigned int pack_len;
+}fibo_pack_head_t;
 typedef enum{
     host_modem_atport = 0, 
     modem_host_atport, 
@@ -70,6 +105,13 @@ typedef struct{
 
 
 /*           Function declaration           */
+int client_send_msg(int socketfd, char* buf, int cmd_len, char* out_buf, int* out_len, FIBO_MSG_MODE* g_port_mode);
+
+int send_msg_to_platfrom(int socketfd, char* buf, int cmd_len, char* out_buf, int* out_len, FIBO_MSG_MODE* g_port_mode);
+
+int send_msg_to_plat_or_modem(int socketfd, char* buf, int cmd_len, FIBO_MSG_MODE* g_port_mode,p_thread_info_t* tinfo);
+
+int common_input_atcmd_proc(int socketfd,char* buf,int num_read,FIBO_MSG_MODE* g_port_mode, p_thread_info_t* tinfo);
 
 void construct_signal_string(char* str, size_t size, int bits);
 
@@ -81,6 +123,9 @@ void* host_to_modem_atport_thread(void* pthread_info);
 
 void* modem_to_host_atport_thread(void* pthread_info);
 
-int send_msg_process(int socketfd,char* buf,int num_read,p_thread_info_t* tinfo);
+static int assemable_packhead(char* buf, fibo_pack_head_t* st_pack);
 
+static int assemable_msghead(char* buf, fibo_msg_head_t* st_pack);
+
+static int assemable_sockhead(char* buf, fibo_sock_head_t* st_pack);
 #endif
