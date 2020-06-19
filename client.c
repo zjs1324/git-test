@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <pthread.h>
 #include <stddef.h>
+#include <errno.h>
 #include "fibo_socket_client.h"
 
 /*        Global variable begin      */
@@ -21,11 +22,14 @@ int g_host_modem_sockfd        = -1;
 FIBO_MSG_MODE g_at_port_mode   = FIBO_COMMAN_AT_MODE;
 
 const fibo_cust_port_cfg fibo_port_cfg[] = 
-    {{host_modem_atport,CLIENT_TO_SERVER_PATH,SERVER_TO_CLIENT_PATH,FIBO_COMMAN_AT_MODE},
-     {modem_host_atport,SERVER_TO_CLIENT_PATH,CLIENT_TO_SERVER_PATH,FIBO_COMMAN_AT_MODE}};
+    {{host_send_msg_atport,HOST_ATPORT_PATH,MODEM_ATPORT_PATH,FIBO_COMMAN_AT_MODE},
+     {sock_rev_msg_atport,FIBO_SOCKET_PATH,HOST_ATPORT_PATH,FIBO_COMMAN_AT_MODE},
+     {modem_rev_msg_atport,MODEM_ATPORT_PATH,HOST_ATPORT_PATH,FIBO_COMMAN_AT_MODE}};
 
 
 /*        Global variable end         */
+
+
 
 static int assemable_packhead(char* buf, fibo_pack_head_t* st_pack){
 
@@ -242,7 +246,7 @@ void* modem_to_host_atport_thread(void* pthread_info){
 
 }
 
-void* host_to_modem_atport_thread(void* pthread_info){
+void* host_send_msg_atport_thread(void* pthread_info){
     printf("%s begin....\n\r",__func__);
 
     int temp_fd                  = -1; 
@@ -365,6 +369,51 @@ void* host_to_modem_atport_thread(void* pthread_info){
 }
 
 
+void* sock_rev_msg_atport_thread(void* pthread_info){
+
+    if(pthread_info == NULL){
+        free(pthread_info);
+        pthread_info = NULL;
+        return NULL;
+    }
+    p_thread_info_t temp_info   =  *((p_thread_info_t*)pthread_info);
+    int num_read    = 0;
+    int ret         = 0;
+    struct pollfd poll_fd;
+    char buf[MAX_MSG_SIZE+1];
+    char temp_buf[MAX_MSG_SIZE+1];
+    fibo_ext_info ext_info;
+    memset(&ext_info, 0, sizeof(fibo_ext_info));
+
+    poll_fd.fd = g_host_modem_sockfd;
+    poll_fd.events = POLLIN | POLLPRI | POLLERR | POLLHUP;
+
+    while(1){
+        //printf("recive data handler poll start\n\r");
+        memset(buf, 0, sizeof(buf));
+
+        ret = 0;
+        ret = poll(&poll_fd, 1, -1);
+
+        if(-1 == ret && errno == EINTR){
+            continue;
+        }else if(-1 == ret){
+            printf("poll failed ret = %d\n\r",ret);
+            break;
+        }
+        /*
+
+        Maybe need to test if poll event set success
+
+        */
+    
+       if(poll_fd.revents & POLLERR){
+                                                                                                                                                                                                                                                                                                                                                                     
+       }
+    }
+
+}
+
 int init_port_bridge(void){
     printf("%s begin\n\r",__func__);
     p_thread_info_t* fibo_port_thread_info;
@@ -415,20 +464,28 @@ int init_port_bridge(void){
             printf("p_to_mutex init sucesss\n\r");
         }
         if((fibo_pth_num == 0 && fibo_port_thread_info[fibo_pth_num].p_thread_name == 0) == 0){
-            //printf("host to modem thread create begin\n\r");
-            if(0 == pthread_create(&fibo_port_thread[fibo_pth_num],NULL,host_to_modem_atport_thread,(void*)&fibo_port_thread_info[fibo_pth_num])){
-                printf("host_to_modem_atport_thread create success\n\r");
+            //printf("host_send_msg_atport thread create begin\n\r");
+            if(0 == pthread_create(&fibo_port_thread[fibo_pth_num],NULL,host_send_msg_atport_thread,(void*)&fibo_port_thread_info[fibo_pth_num])){
+                printf("host_send_msg_atport_thread create success\n\r");
             }
             else{
-                printf("host_to_modem_atport_thread create failed\n\r");
+                printf("host_send_msg_atport_thread create failed\n\r");
             }
         }else if((fibo_pth_num == 1 && fibo_port_thread_info[fibo_pth_num].p_thread_name == 1) == 0){
-            //printf("modem to host thread create begin\n\r");
-            if(0 == pthread_create(&fibo_port_thread[fibo_pth_num],NULL,modem_to_host_atport_thread,(void*)&fibo_port_thread_info[fibo_pth_num])){
-                printf("host_to_modem_atport_thread create success\n\r");
+            //printf("sock_rev_msg_atport thread create begin\n\r");
+            if(0 == pthread_create(&fibo_port_thread[fibo_pth_num],NULL,sock_rev_msg_atport_thread,(void*)&fibo_port_thread_info[fibo_pth_num])){
+                printf("sock_rev_msg_atport_thread create success\n\r");
             }
             else{
-                printf("host_to_modem_atport_thread create failed\n\r");
+                printf("sock_rev_msg_atport_thread create failed\n\r");
+            }
+        }else if((fibo_pth_num == 2 && fibo_port_thread_info[fibo_pth_num].p_thread_name == 2) == 0){
+            //printf("modem_rev_msg_atport thread create begin\n\r");
+            if(0 == pthread_create(&fibo_port_thread[fibo_pth_num],NULL,modem_to_host_atport_thread,(void*)&fibo_port_thread_info[fibo_pth_num])){
+                printf("modem_rev_msg_atport_thread create success\n\r");
+            }
+            else{
+                printf("modem_rev_msg_atport_thread create failed\n\r");
             }
         }
         

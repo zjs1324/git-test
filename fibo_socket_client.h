@@ -10,8 +10,8 @@
 #define MAX_MSG_SIZE_WITH_HEAD  128 * 1024
 #define MAX_RECV_LEN  4 * 1024
 #define FIBO_SOCKET_PATH "/home/fibo/VScode_prj/socket.domain"
-#define CLIENT_TO_SERVER_PATH "/home/fibo/VScode_prj/client_to_server.domain"
-#define SERVER_TO_CLIENT_PATH "/home/fibo/VScode_prj/server_to_client.domain"
+#define HOST_ATPORT_PATH "/home/fibo/VScode_prj/client_to_server.domain"
+#define MODEM_ATPORT_PATH "/home/fibo/VScode_prj/server_to_client.domain"
 #define MY_DEBUG printf("[%s %s] %s: %s: %d\n",__DATE__,__TIME__,__FILE__,__FUNCTION__,__LINE__);
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
@@ -58,7 +58,7 @@ typedef enum{
     MSG_ASYNC = 0x1,
     MSG_IND   = 0x2,
     MSG_MAX   = 0x3
-}FIBO_MSF_TYPE;
+}FIBO_MSG_TYPE;
 
 typedef struct{
     FIBO_MSG_MODE cmd_type;
@@ -71,7 +71,7 @@ typedef struct{
 }fibo_sock_head_t;
 typedef struct{
     unsigned long int txn_id;
-    FIBO_MSF_TYPE msg_type;
+    FIBO_MSG_TYPE msg_type;
     int msg_not_finish;
 }fibo_msg_head_t;
 
@@ -80,8 +80,9 @@ typedef struct{
     unsigned int pack_len;
 }fibo_pack_head_t;
 typedef enum{
-    host_modem_atport = 0, 
-    modem_host_atport, 
+    host_send_msg_atport = 0,
+    sock_rev_msg_atport, 
+    modem_rev_msg_atport, 
     end_port
 }fibo_thread_name;
 
@@ -103,6 +104,11 @@ typedef struct{
     pthread_mutex_t p_to_mutex;
 }p_thread_info_t;
 
+typedef struct{
+    FIBO_MSG_TYPE m_type;
+    FIBO_MSG_MODE m_mode;
+    int data_len;
+}fibo_ext_info;
 
 /*           Function declaration           */
 int client_send_msg(int socketfd, char* buf, int cmd_len, char* out_buf, int* out_len, FIBO_MSG_MODE* g_port_mode);
@@ -119,9 +125,11 @@ int init_socket_client_port(int g_socketfd);
 
 int init_port_bridge(void);
 
-void* host_to_modem_atport_thread(void* pthread_info);
+void* host_send_msg_atport_thread(void* pthread_info);
 
-void* modem_to_host_atport_thread(void* pthread_info);
+void* sock_rev_msg_atport_thread(void* pthread_info);
+
+void* modem_rev_msg_atport_thread(void* pthread_info);
 
 static int assemable_packhead(char* buf, fibo_pack_head_t* st_pack);
 

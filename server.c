@@ -69,19 +69,19 @@ int main(void){
     while(1){
         
     }
-#if 0
+#if 1
     char ch[MAX_OUTPUT_LEN];
     int client_sockfd;
     struct sockaddr_un client_addr;
     socklen_t len = sizeof(client_addr);
     while(1){
         printf("server waiting:\n");
-        client_sockfd = accept(server_sockfd,(struct sockaddr *)&client_addr,&len);
+        client_sockfd = accept(ser_listenfd,(struct sockaddr *)&client_addr,&len);
 
-        read(client_sockfd,ch,MAX_OUTPUT_LEN);
+        read(client_sockfd, ch, MAX_OUTPUT_LEN);
         printf("get char from client: %s\n",ch);
         if(strcmp(ch,"exit") != 0){
-            write(client_sockfd,ch,MAX_OUTPUT_LEN);
+            //write(client_sockfd,ch,MAX_OUTPUT_LEN);
             close(client_sockfd);
         }
         else{
